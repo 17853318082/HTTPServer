@@ -7,19 +7,21 @@
 #include <stdio.h>
 #include <strings.h>
 #include <sys/stat.h> // 判断文件是否存在方法头文件
-
 #include "my_socket.cpp"
+#include <fstream>
+#include <sstream>
+
 using namespace std;
 
+void SendRespond(int cfd, int no, char *disp, char *type, int len);
 
 /*获取文件类型*/
 char *GetFileType(char *name)
 {
-    char* dot;
-
-    // 读取客户端请求文件类型
-    dot = strrchr(name, '.');	// 获取文件名.后面的文件类型
-    if (dot == (char*)0)
+    char *dot;
+    // 获取文件类型
+    dot = strrchr(name, '.'); // 获取文件名.后面的文件类型
+    if (dot == (char *)0)
         return "text/plain; charset=utf-8";
     if (strcmp(dot, ".html") == 0 || strcmp(dot, ".htm") == 0)
         return "text/html; charset=utf-8";
@@ -33,7 +35,7 @@ char *GetFileType(char *name)
         return "text/css";
     if (strcmp(dot, ".au") == 0)
         return "audio/basic";
-    if (strcmp( dot, ".wav") == 0)
+    if (strcmp(dot, ".wav") == 0)
         return "audio/wav";
     if (strcmp(dot, ".avi") == 0)
         return "video/x-msvideo";
@@ -58,35 +60,61 @@ char *GetFileType(char *name)
 /*发送404错误页面*/
 void SendFalsePage(int cfd)
 {
-    char buf[BUFSIZ];
-    int n = 0;
-    int fd = open("web/404.html", O_RDONLY);
-    while ((n = read(cfd, buf, sizeof(buf)) > 0))
+    // 发送请求头
+    SendRespond(cfd, 404, "NOT FOUND", "Content-Type: text.html", -1); // -1表示让浏览器自己算长度
+    // 读取文件内容
+    ifstream fin("web/error.html");        // 创建一个文件输入流对象
+    // fin.open("./404.jpg"); // 打开文件
+    if (fin.is_open())
     {
-        // 将文件发送给客户端
-        send(cfd, buf, n, 0);
+        // 打开文件成功将数据发送给客户端
+        // 读取文件中的数据
+        std::ostringstream buf;
+        buf << fin.rdbuf();         // 将文件写入字符串输出流缓冲区
+        string content = buf.str(); // 将缓冲区数据写入string对象
+        // 将数据发往客户端
+        send(cfd, (const void *)content.c_str(), content.size(), 0);
     }
 }
+
 /*发送给客户端浏览器想要的文件*/
 void SendFile(int cfd, const char *file_path)
 {
-    char buf[BUFSIZ] = {0};
-    int n = 0;
     // 读取文件内容
-    int fd = open(file_path, O_RDONLY);
-    // 文件不存在
-    if (fd == -1)
+    ifstream fin;        // 创建一个文件输入流对象
+    fin.open(file_path); // 打开文件
+    if (fin.is_open())
     {
-        // 发送404
-        cout << "open error" << endl;
+        // 打开文件成功将数据发送给客户端
+        // 读取文件中的数据
+        std::ostringstream buf;
+        buf << fin.rdbuf();         // 将文件写入字符串输出流缓冲区
+        fin.close();
+        string content = buf.str(); // 将缓冲区数据写入string对象
+        // 将数据发往客户端
+        send(cfd, (const void *)content.c_str(), content.size(), 0);
+    }
+    else
+    {
+        fin.close(); 
+        // cout<<"打开文件失败发动错误页面"<<endl;
+        // 打开文件失败发送404
         SendFalsePage(cfd);
     }
-    while ((n = read(fd, buf, sizeof(buf)) > 0))
-    {
-        cout<<buf<<endl;
-        // 将文件发送给客户端
-        send(cfd, buf, n, 0);
-    }
+
+    // 文件不存在
+    // if (file == -1)
+    // {
+    //     // 打开文件失败 发送404
+    //     cout << "open error" << endl;
+    //     SendFalsePage(cfd);
+    // }
+    // while ((n = read(file, buf, sizeof(buf)) > 0))
+    // {
+    //     cout<<"   "<<n<<endl;
+    //     // 将文件发送给客户端
+    //     send(cfd, buf, sizeof(buf), 0);
+    // }
 }
 
 /*回应客户端请求 fd,回应号，回应状态，请求头，长度  ----- 发送回应头*/
@@ -99,6 +127,7 @@ void SendRespond(int cfd, int no, char *disp, char *type, int len)
     send(cfd, buf, strlen(buf), 0);
     sprintf(buf, "%s\r\n", type);
     sprintf(buf, "Content-Length:%d\r\n", len);
+    // 发送 空行
     send(cfd, "\r\n", 2, 0);
 }
 
@@ -107,16 +136,25 @@ void HttpRequest(int cfd, const char *file_path)
 {
     // 判断文件是否存在
     struct stat sbuf;
+    // 设置默认访问页面
     char type[BUFSIZ] = {"Content-Type: "};
     char name[BUFSIZ];
-    strcpy(name,file_path);
+    // 设置默认访问页面
+    if(strcmp(file_path,"/") == 0){
+        cout<<"进入默认页面"<<endl;
+        strcpy(name,"/web/index.html");
+    }else{
+        strcpy(name, file_path);
+    }
+    cout<<"返回页面："<<name<<endl;
     int ret = stat(file_path, &sbuf);
     if (ret != 0)
     {
         // 会发浏览器404页面
         // error("open file false");
-        cout<<"open file false"<<endl;
+        cout << "open file false" << endl;
         SendFalsePage(cfd);
+        return;
     }
     // 是一个普通的文件
     if (S_ISREG(sbuf.st_mode))
@@ -124,8 +162,8 @@ void HttpRequest(int cfd, const char *file_path)
         cout << "回应客户端请求" << endl;
         // 获取文件类型
         // 类型拼接
-        strcat(type,GetFileType(name));
-        cout<<type<<endl;
+        strcat(type, GetFileType(name));
+        cout << type << endl;
         // 回应 http协议应答---- 发送回应头
         SendRespond(cfd, 200, "OK", type, -1); // -1表示让浏览器自己算长度
         // 回发给客户端请求
@@ -147,8 +185,8 @@ int DoRespond(int cfd, char *buf)
         char *file_path = path + 1; // 取出客户端文件名
         // 处理文件
         HttpRequest(cfd, file_path);
-    }
 
+    }
     return 0;
 }
 

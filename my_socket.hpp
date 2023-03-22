@@ -15,8 +15,8 @@
 #include <fcntl.h>
 #include <string.h>
 
-#ifndef _WRAP_H_
-#define _WRAP_H_
+#ifndef _MY_SOCKET_
+#define _MY_SOCKET_
 
 // state socket methods
 

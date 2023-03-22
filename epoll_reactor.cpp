@@ -9,6 +9,8 @@ epoll反应堆模型
 #include <sys/epoll.h>
 #include <string>
 #include "respond.cpp"
+#include "threadpool.cpp"
+#include <mutex>
 
 using namespace std;
 
@@ -61,8 +63,8 @@ void ReciveData(int fd, int events, void *arg)
     struct myevent_s *ev = (struct myevent_s *)arg;
     int len;
     // len = recv(fd, ev->buf, sizeof(ev->buf), 0);
-    len = DoRead(fd,ev->buf);
-    EventDel(g_efd, ev); // 读取数据，然后从监听红黑树中删除
+    len = DoRead(fd, ev->buf);
+    // EventDel(g_efd, ev); // 读取数据，然后从监听红黑树中删除
     if (len > 0)
     {
         ev->len = len;
@@ -96,13 +98,14 @@ void SendData(int fd, int events, void *arg)
     // 从缓冲区中把需要发送给用户的数据发出去
     struct myevent_s *ev = (struct myevent_s *)arg;
     int len;
+    // cout<<"发送事件收到的数据"
     // len = send(fd, ev->buf, ev->len, 0); // 将数据发送给客户fd
-    DoRespond(fd,ev->buf);
+    DoRespond(fd, ev->buf);
     // 从红黑树中移除
-    EventDel(g_efd, ev);
+    // EventDel(g_efd, ev);
     // 回应完客户端，即关闭链接，不在进行重复访问
     Close(ev->fd);
-    
+
     return;
 }
 
@@ -120,6 +123,7 @@ void EventAdd(int efd, int events, struct myevent_s *ev)
         op = EPOLL_CTL_ADD;
         ev->status = 1; // 加入红黑树，状态标位1
     }
+    
     // 加入结构体
     if (epoll_ctl(efd, op, ev->fd, &epv) < 0)
     {
@@ -216,6 +220,10 @@ void epoll_run(int port)
 {
     // 初始化一个socket套接字,传入服务器端口
     int lfd = InitListenSocket(port);
+
+    // 创建一个线程池,包含十个线程
+    ThreadPool thread_pool(10);
+
     // 创建一个监听红黑树
     g_efd = epoll_create(MAX_EVENTS);
     if (g_efd <= 0)
@@ -228,7 +236,7 @@ void epoll_run(int port)
 
     struct epoll_event events[MAX_EVENTS + 1]; // 存储满足监听条件的my_events
     cout << "准备就绪开始监听>>" << endl;
-    int checkpos = 1;   // 记录超时客户的位置
+    int checkpos = 1; // 记录超时客户的位置
     // 循环监听客户请求
     while (true)
     {
@@ -272,13 +280,34 @@ void epoll_run(int port)
             // 客户的读写事件
             if (ev->events & EPOLLIN && events[i].events & EPOLLIN)
             {
+                if (ev->fd == lfd)
+                {
+                    // cout << "建立链接事件，将事件加入任务队列" << endl;
+                    ev->call_back(ev->fd, events[i].events, ev->arg); 
+                }
+                else
+                {
+                    // cout << "读事件，将事件加入任务队列" << endl;
+                    // cout << "事件：" << ev->fd<<i<< "加入任务队列" << endl;
+                    Task task(ev->call_back, ev->fd, events[i].events, ev->arg);
+                    thread_pool.AddTask(task);
+                    // 加入任务队列之后，提前将其取下，防止继续触发epoll_wait
+                    EventDel(g_efd,ev);
+                }
                 // 读就绪事件  ,这个就包含了，客户端链接事件
-                ev->call_back(ev->fd, events[i].events, ev->arg); // 执行读事件
+                // ev->call_back(ev->fd, events[i].events, ev->arg); // 执行读事件
+                // 创建任务，并将任务添加进任务队列
             }
             if (ev->events & EPOLLOUT && events[i].events & EPOLLOUT)
             {
                 // 写就绪事件，向客户端发送
-                ev->call_back(ev->fd, events[i].events, ev->arg);
+                // ev->call_back(ev->fd, events[i].events, ev->arg);
+
+                // 创建任务，并将任务添加进任务队列
+                Task task(ev->call_back, ev->fd, events[i].events, ev->arg);
+                thread_pool.AddTask(task);
+                // 加入任务队列之后，提前将其取下，防止继续触发epoll_wait
+                EventDel(g_efd,ev);
             }
         }
     }

@@ -146,7 +146,7 @@ void HttpRequest(int cfd, const char *file_path)
     }else{
         strcpy(name, file_path);
     }
-    cout<<"返回页面："<<name<<endl;
+    // cout<<"返回页面："<<name<<endl;
     int ret = stat(file_path, &sbuf);
     if (ret != 0)
     {
@@ -159,7 +159,6 @@ void HttpRequest(int cfd, const char *file_path)
     // 是一个普通的文件
     if (S_ISREG(sbuf.st_mode))
     {
-        cout << "回应客户端请求" << endl;
         // 获取文件类型
         // 类型拼接
         strcat(type, GetFileType(name));

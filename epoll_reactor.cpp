@@ -27,6 +27,8 @@ void ReciveData(int fd, int events, void *arg);                                 
 void SendData(int fd, int events, void *arg);                                                // 删除客户端数据
 void AcceptConnect(int lfd, int events, void *arg);                                          // 与客户端建立链接
 
+mutex lock_g_efd;
+
 /*描述就绪文件描述符相关信息*/
 struct myevent_s
 {
@@ -64,30 +66,33 @@ void ReciveData(int fd, int events, void *arg)
     int len;
     // len = recv(fd, ev->buf, sizeof(ev->buf), 0);
     len = DoRead(fd, ev->buf);
+    cout<<"fd: "<<ev->fd<<" len: "<<len<<"content:"<<ev->buf;
+    // 发送数据
+    SendData(fd,events,arg);
     // EventDel(g_efd, ev); // 读取数据，然后从监听红黑树中删除
-    if (len > 0)
-    {
-        ev->len = len;
-        ev->buf[len] = '\0';
-        cout << "receive:"
-             << "fd:" << fd << " events:" << events
-             << " len:" << ev->len << " content:" << ev->buf;
-        EventSet(ev, fd, SendData, ev); // 设置该fd写回调函数
-        EventAdd(g_efd, EPOLLOUT, ev);  // 将fd加入红黑树g_efd中，监听写事件
-    }
-    else if (len == 0)
-    {
-        cout << "---------------------关闭链接--------------------" << endl;
-        // 客户端已关闭
-        Close(fd); // 关闭客户端字节符
-        // 地址相减得到相对的数据位置
-        cout << "closed: fd:" << fd << " pos:" << ev - g_events << endl;
-    }
-    else
-    {
-        Close(fd);
-        cout << "error " << strerror(errno) << endl;
-    }
+    // if (len > 0)
+    // {
+    //     ev->len = len;
+    //     ev->buf[len] = '\0';
+    //     cout << "receive:"
+    //          << "fd:" << fd << " events:" << events
+    //          << " len:" << ev->len << " content:" << ev->buf;
+    //     EventSet(ev, fd, SendData, ev); // 设置该fd写回调函数
+    //     EventAdd(g_efd, EPOLLOUT, ev);  // 将fd加入红黑树g_efd中，监听写事件
+    // }
+    // else if (len == 0)
+    // {
+    //     cout << "---------------------关闭链接--------------------" << endl;
+    //     // 客户端已关闭
+    //     Close(fd); // 关闭客户端字节符
+    //     // 地址相减得到相对的数据位置
+    //     cout << "closed: fd:" << fd << " pos:" << ev - g_events << endl;
+    // }
+    // else
+    // {
+    //     Close(fd);
+    //     cout << "error " << strerror(errno) << endl;
+    // }
 
     return;
 }
@@ -123,7 +128,7 @@ void EventAdd(int efd, int events, struct myevent_s *ev)
         op = EPOLL_CTL_ADD;
         ev->status = 1; // 加入红黑树，状态标位1
     }
-    
+
     // 加入结构体
     if (epoll_ctl(efd, op, ev->fd, &epv) < 0)
     {
@@ -133,6 +138,7 @@ void EventAdd(int efd, int events, struct myevent_s *ev)
     {
         cout << "event add ok: fd: " << ev->fd << " events:" << events << endl;
     }
+
     return;
 }
 
@@ -283,7 +289,7 @@ void epoll_run(int port)
                 if (ev->fd == lfd)
                 {
                     // cout << "建立链接事件，将事件加入任务队列" << endl;
-                    ev->call_back(ev->fd, events[i].events, ev->arg); 
+                    ev->call_back(ev->fd, events[i].events, ev->arg);
                 }
                 else
                 {
@@ -292,7 +298,7 @@ void epoll_run(int port)
                     Task task(ev->call_back, ev->fd, events[i].events, ev->arg);
                     thread_pool.AddTask(task);
                     // 加入任务队列之后，提前将其取下，防止继续触发epoll_wait
-                    EventDel(g_efd,ev);
+                    EventDel(g_efd, ev);
                 }
                 // 读就绪事件  ,这个就包含了，客户端链接事件
                 // ev->call_back(ev->fd, events[i].events, ev->arg); // 执行读事件
@@ -307,7 +313,7 @@ void epoll_run(int port)
                 Task task(ev->call_back, ev->fd, events[i].events, ev->arg);
                 thread_pool.AddTask(task);
                 // 加入任务队列之后，提前将其取下，防止继续触发epoll_wait
-                EventDel(g_efd,ev);
+                EventDel(g_efd, ev);
             }
         }
     }

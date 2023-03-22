@@ -129,6 +129,7 @@ void SendRespond(int cfd, int no, char *disp, char *type, int len)
     sprintf(buf, "Content-Length:%d\r\n", len);
     // 发送 空行
     send(cfd, "\r\n", 2, 0);
+    return;
 }
 
 /*处理客户端请求，判断文件是否存在*/

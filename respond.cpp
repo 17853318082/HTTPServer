@@ -16,8 +16,8 @@ using namespace std;
 char *GetFileType(char *name)
 {
     char* dot;
-    //返回文件类型
 
+    // 读取客户端请求文件类型
     dot = strrchr(name, '.');	// 获取文件名.后面的文件类型
     if (dot == (char*)0)
         return "text/plain; charset=utf-8";

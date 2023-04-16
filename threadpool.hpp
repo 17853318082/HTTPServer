@@ -17,18 +17,14 @@
 class Task{
     public:
     Task(){};
-    // Task(int n):n(n){}
     // 构造函数，三个参数
     Task(void (*fun)(int,int,void*),int fd,int events,void* arg)
     :fun(fun),fd(fd),events(events),arg(arg){};
 
     void run(){
-        // std::this_thread::sleep_for(1s);
-        // std::cout<<"线程："<<std::this_thread::get_id()<<" 在执行任务："<<n<<std::endl;
         fun(fd,events,arg);
     }
     private:
-    // int n;
     void (*fun)(int,int,void*);   // 任务函数指针
     // 指针所需要的三个参数
     int fd;
@@ -57,7 +53,6 @@ private:
     bool is_exit;                      // 是否退出
 };
 
-
 ThreadPool::ThreadPool(int num) : thread_num(num),is_exit(false)
 {
     // 构造函数创建num个线程
@@ -75,11 +70,11 @@ void ThreadPool::ThreadWork()
         {
             // 创建唯一锁对象
             std::unique_lock<std::mutex> lock(this->queue_mutex);
-            // 条件阻塞，当队列非空，或者是线程池销毁时加锁
+            // 条件阻塞，当队列非空，或者是线程池销毁时加锁,如果不加lamda表达式，则默认为false
             this->condition.wait(lock, [this]
                                  { return this->is_exit || !this->tasks.empty(); });
             // 如果是线程池销毁条件，则退出该线程
-            if (this->is_exit && this->tasks.empty())
+            if (this->is_exit && this->tasks.empty()) 
             {
                 return;
             }

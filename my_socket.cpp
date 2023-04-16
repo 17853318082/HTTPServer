@@ -2,7 +2,7 @@
   pakage socket method
 */
 
-#include "my_socket.hpp"
+#include "my_socket.h"
 
 // return error
 void error(const std::string &str)

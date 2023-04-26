@@ -114,16 +114,5 @@ ThreadPool::~ThreadPool(){
     }
 }
 
-// int main(){
-//     // 创建一个线程池，线程数为5
-//     ThreadPool tp(5);
-//     // 向线程池添加任务
-//     for(int i=0;i<1000;i++){
-//         Task task(i+1);
-//         tp.AddTask(task);
-//     }
-//     getchar();
-//     return 0;
-// }
 
 #endif

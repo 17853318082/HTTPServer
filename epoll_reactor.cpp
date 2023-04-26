@@ -239,7 +239,6 @@ void epoll_run(int port)
     // 初始化一个myevent_s结构体对象，将客户端字节符初始化到myevent_s结构体中，将服务器socket字节符存在了数组的最后一个
     EventSet(&g_events[MAX_EVENTS], lfd, AcceptConnect, &g_events[MAX_EVENTS]);
     EventAdd(g_efd, EPOLLIN, &g_events[MAX_EVENTS]); // 放到结构体数组的第一个位置
-
     struct epoll_event events[MAX_EVENTS + 1]; // 存储满足监听条件的my_events
     cout << "准备就绪开始监听>>" << endl;
     int checkpos = 1; // 记录超时客户的位置

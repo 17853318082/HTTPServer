@@ -8,7 +8,7 @@
 void error(const std::string &str)
 {
     std::cout << str << " error" << std::endl;
-    exit(-1);
+    // exit(-1);
 }
 // return success
 void success(const std::string &str)

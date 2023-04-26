@@ -74,6 +74,9 @@ void SendFalsePage(int cfd)
         string content = buf.str(); // 将缓冲区数据写入string对象
         // 将数据发往客户端
         send(cfd, (const void *)content.c_str(), content.size(), 0);
+    }else
+    {
+        cout<<"未找到错误页面"<<endl;
     }
 }
 
@@ -128,7 +131,17 @@ void SendRespond(int cfd, int no, char *disp, char *type, int len)
     sprintf(buf, "%s\r\n", type);
     sprintf(buf, "Content-Length:%d\r\n", len);
     // 发送 空行
-    send(cfd, "\r\n", 2, 0);
+    int error = 0;
+    socklen_t len_error = sizeof(error);
+    int ret = getsockopt(cfd, SOL_SOCKET, SO_ERROR, &error, &len_error);  // 获取套接字状态
+    // 检查套接字状态，如果链接已关闭，则不再进行发送
+    if (ret < 0 || error != 0)
+    {
+        cout<<"链接已关闭停止发送"<<endl;
+        // 处理错误
+    } else{
+        send(cfd, "\r\n", 2, 0);
+    }
     return;
 }
 
@@ -171,6 +184,7 @@ void HttpRequest(int cfd, const char *file_path)
     }
 }
 
+/*解析请求第一行*/
 /*根据请求头第一行，回应客户端想要的信息*/
 int DoRespond(int cfd, char *buf)
 {
@@ -218,5 +232,3 @@ int DoRead(int cfd, char *buf)
     // 返回操作后的数据长度
     return len;
 }
-
-/**/
